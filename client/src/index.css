@@ -2,6 +2,14 @@
 @import "tailwindcss";
 * {
   font-family: "Playfair Display", serif;
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
 }
 ::-webkit-scrollbar {
   display: none;

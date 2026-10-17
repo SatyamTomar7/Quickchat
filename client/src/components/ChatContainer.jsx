@@ -93,17 +93,17 @@ const ChatContainer = () => {
   }, [getMessages, selectedConversation]);
 
   return activeConversation ? (
-    <div className="h-full overflow-scroll relative backdrop-blur-lg">
+    <div className="h-full min-w-0 overflow-hidden relative backdrop-blur-lg">
       {/* header   */}
-      <div className="flex items-center gap-3 py-3 mx-4 border-b border-stone-500">
+      <div className="flex items-center gap-2 sm:gap-3 py-3 mx-3 sm:mx-4 border-b border-stone-500">
         <img
           src={activeConversation.image || activeConversation.profilePic || assets.avatar_icon}
           alt=""
           className="w-8 rounded-full"
         />
-        <div className="flex-1 text-lg text-white">
+        <div className="flex-1 min-w-0 text-base sm:text-lg text-white">
           <p className="flex items-center gap-2">
-          {activeConversation.name || activeConversation.fullName}
+          <span className="truncate">{activeConversation.name || activeConversation.fullName}</span>
           {!selectedConversation && onlineUsers.includes(selectedUser._id) && (
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
           )}
@@ -128,7 +128,7 @@ const ChatContainer = () => {
         onScroll={(event) => {
           if (event.currentTarget.scrollTop === 0) loadOlderMessages();
         }}
-        className="flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6"
+        className="flex flex-col h-[calc(100%-120px)] overflow-y-auto p-2 sm:p-3 pb-6"
       >
         {messagePage.loading && <p className="text-center text-xs text-gray-400">Loading older messages...</p>}
         {messages.map((msg) => {
@@ -154,7 +154,7 @@ const ChatContainer = () => {
                 <input
                   value={editingText}
                   onChange={(event) => setEditingText(event.target.value)}
-                  className="p-2 rounded bg-gray-800 text-white"
+                  className="min-w-0 w-32 sm:w-auto p-2 rounded bg-gray-800 text-white"
                   maxLength={2000}
                 />
                 <button onClick={() => saveEdit(msg._id)} className="text-green-300">Save</button>
@@ -168,7 +168,7 @@ const ChatContainer = () => {
               />
             ) : (
               <p
-                className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${isMine ? "rounded-br-none" : "rounded-bl-none"}`}
+                className={`p-2 max-w-[min(75vw,400px)] md:text-sm font-light rounded-lg mb-8 break-words bg-violet-500/30 text-white ${isMine ? "rounded-br-none" : "rounded-bl-none"}`}
               >
                 {msg.text}
               </p>
@@ -233,7 +233,7 @@ const ChatContainer = () => {
 
       {/* bottm area  */}
 
-      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 p-3 ">
+      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-[#171329]/40">
         <div className="flex-1 bg-gray-100/12 px-3 rounded-full">
           <input
             type="text"
@@ -241,7 +241,7 @@ const ChatContainer = () => {
             onChange={handleInputChange}
             onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
             placeholder="Send a message"
-            className="w-full bg-transparent py-2 outline-none"
+            className="w-full bg-transparent py-2 outline-none text-sm sm:text-base"
           />
         </div>
         <input
@@ -252,13 +252,13 @@ const ChatContainer = () => {
           hidden
         />
         <label htmlFor="image" className="cursor-pointer">
-          <img src={assets.gallery_icon} alt="" className="w-5" />
+          <img src={assets.gallery_icon} alt="" className="w-5 h-5" />
         </label>
         <img
           onClick={handleSendMessage}
           src={assets.send_button}
           alt=""
-          className="w-7 cursor-pointer"
+          className="w-7 h-7 cursor-pointer"
         />
       </div>
     </div>

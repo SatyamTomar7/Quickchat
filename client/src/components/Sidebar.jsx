@@ -51,11 +51,11 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`bg-[#8185B2]/10 h-full p-5 rounded-r-xl overflow-y-scroll text-white ${selectedUser ? "max-md:hidden" : ""}`}
+      className={`bg-[#8185B2]/10 h-full min-w-0 p-3 sm:p-5 rounded-r-xl overflow-y-auto text-white ${selectedUser ? "max-md:hidden" : ""}`}
     >
       <div className="pb-5">
         <div className="flex justify-between items-center">
-          <img src={assets.logo} alt="logo" className="max-w-40" />
+          <img src={assets.logo} alt="logo" className="w-full max-w-40" />
 
           <div className="relative py-2 group">
             <img
@@ -78,7 +78,7 @@ const Sidebar = () => {
             </div>
           </div>
         </div>
-        <div className="bg-[#282142]  rounded-full flex items-center gap-2 py-3 px-4 mt-5">
+        <div         className="bg-[#282142] rounded-full flex items-center gap-2 py-2.5 px-3 sm:px-4 mt-4 sm:mt-5">
           <img src={assets.search_icon} alt="Search" className="w-3" />
           <input
             onChange={(e) => setInput(e.target.value)}
@@ -90,7 +90,7 @@ const Sidebar = () => {
         <button
           type="button"
           onClick={handleCreateGroup}
-          className="mt-3 w-full rounded-full bg-violet-600/70 py-2 text-sm"
+          className="mt-3 w-full rounded-full bg-violet-600/70 py-2.5 text-sm"
         >
           Create group
         </button>

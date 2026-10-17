@@ -30,13 +30,13 @@ const LoginPage = () => {
     login(state, credentials);
   };
   return (
-    <div className="min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl">
+    <div className="min-h-screen w-full bg-cover bg-center flex items-center justify-center gap-8 px-4 py-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl">
       {/* left  */}
-      <img src={assets.logo_big} alt="" className="w-[min(30vw,250px)]" />
+      <img src={assets.logo_big} alt="" className="w-[min(55vw,250px)] sm:w-[min(30vw,250px)]" />
       {/* right  */}
       <form
         onSubmit={onSubmitHandler}
-        className="border-2 bg-white/8 text-white border-gray-500 p-6 flex flex-col gap-6 rounded-lg shadow-lg"
+        className="w-full max-w-md border-2 bg-white/8 text-white border-gray-500 p-5 sm:p-6 flex flex-col gap-5 sm:gap-6 rounded-lg shadow-lg"
       >
         <h2 className="font-medium text-2xl flex justify-between items-center">
           {currentState === "signup" ? "Sign Up" : "Login"}
