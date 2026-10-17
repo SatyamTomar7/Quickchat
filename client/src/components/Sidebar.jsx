@@ -12,16 +12,38 @@ const Sidebar = () => {
     setSelectedUser,
     unseenMessages,
     setUnseenMessages,
+    conversations,
+    selectedConversation,
+    setSelectedConversation,
+    getConversations,
+    createGroup,
+    searchUsers,
+    searchedUsers,
   } = useContext(ChatContext);
   const navigate = useNavigate();
   const [input, setInput] = useState("");
   const { logout, onlineUsers } = useContext(AuthContext);
 
-  const filteredUsers = input
-    ? users.filter((user) =>
-        user.fullName.toLowerCase().includes(input.toLowerCase()),
-      )
-    : users;
+  useEffect(() => {
+    getConversations();
+  }, [getConversations]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => searchUsers(input), 250);
+    return () => window.clearTimeout(timer);
+  }, [input, searchUsers]);
+
+  const handleCreateGroup = async () => {
+    const name = window.prompt("Group name");
+    if (!name?.trim()) return;
+    const selectedIds = users
+      .filter((user) => window.confirm(`Add ${user.fullName} to this group?`))
+      .map((user) => user._id);
+    if (!selectedIds.length) return;
+    await createGroup(name.trim(), selectedIds);
+  };
+
+  const filteredUsers = input ? searchedUsers : users;
 
   useEffect(() => {
     getUsers();
@@ -65,9 +87,32 @@ const Sidebar = () => {
             placeholder="Search User..."
           />
         </div>
+        <button
+          type="button"
+          onClick={handleCreateGroup}
+          className="mt-3 w-full rounded-full bg-violet-600/70 py-2 text-sm"
+        >
+          Create group
+        </button>
       </div>
 
       <div className="flex flex-col">
+        {conversations.map((conversation) => (
+          <div
+            key={conversation._id}
+            className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${selectedConversation?._id === conversation._id && "bg-[#282142]/50"}`}
+            onClick={() => {
+              setSelectedConversation(conversation);
+              setSelectedUser(null);
+            }}
+          >
+            <img src={conversation.image || assets.avatar_icon} alt="" className="w-9 aspect-square rounded-full" />
+            <div className="flex flex-col leading-5">
+              <p>{conversation.name}</p>
+              <span className="text-neutral-400 text-xs">Group · {conversation.members.length} members</span>
+            </div>
+          </div>
+        ))}
         {filteredUsers.map((user, index) => (
           <div
             className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${selectedUser?._id === user._id && "bg-[#282142]/50"}`}

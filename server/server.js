@@ -6,9 +6,12 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { connectDB } from "./lib/db.js";
 import Message from "./models/Message.js";
+import Conversation from "./models/Conversation.js";
 import { isValidObjectId } from "./lib/validation.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
+import conversationRouter from "./routes/conversationRoutes.js";
+import searchRouter from "./routes/searchRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -104,12 +107,25 @@ io.on("connection", (socket) => {
     if (!isValidObjectId(receiverId) || receiverId === userId) return;
     emitToUser(receiverId, "typing:stop", { userId });
   });
+
+  socket.on("conversation:join", async (payload) => {
+    const conversationId = payload?.conversationId;
+    if (!isValidObjectId(conversationId)) return;
+    const conversation = await Conversation.exists({ _id: conversationId, members: userId, deleted: false });
+    if (conversation) socket.join(`conversation:${conversationId}`);
+  });
+
+  socket.on("conversation:leave", (payload) => {
+    if (isValidObjectId(payload?.conversationId)) socket.leave(`conversation:${payload.conversationId}`);
+  });
 });
 
 // ✅ Routes
 app.get("/api/status", (req, res) => res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/conversations", conversationRouter);
+app.use("/api/search", searchRouter);
 
 app.use((error, req, res, next) => {
   if (error.type === "entity.too.large") {

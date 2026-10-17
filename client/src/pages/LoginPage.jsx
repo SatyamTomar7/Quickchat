@@ -14,7 +14,7 @@ const LoginPage = () => {
 
   const onSubmitHandler = (e) => {
     e.preventDefault();
-    if (!isChecked) {
+    if (currentState === "signup" && !isChecked) {
       alert("Please agree to terms and conditions");
       return;
     }
@@ -22,12 +22,12 @@ const LoginPage = () => {
       setIsDataSubmitted(true);
       return;
     }
-    login(currentState === "signup" ? "signup" : "login", {
-      fullName,
-      email,
-      password,
-      bio,
-    });
+    const state = currentState === "signup" ? "signup" : "login";
+    const credentials =
+      state === "signup"
+        ? { fullName, email, password, bio }
+        : { email, password };
+    login(state, credentials);
   };
   return (
     <div className="min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl">
@@ -95,14 +95,16 @@ const LoginPage = () => {
         >
           {currentState === "signup" ? "Create Account" : "Login Now"}
         </button>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={(e) => setIsChecked(e.target.checked)}
-          />
-          <p>Agree to the terms of use & privacy policy</p>
-        </div>
+        {currentState === "signup" && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={(e) => setIsChecked(e.target.checked)}
+            />
+            <p>Agree to the terms of use & privacy policy</p>
+          </div>
+        )}
         <div className="flex flex-col gap-2">
           {currentState === "signup" ? (
             <p className="text-sm text-gray-600">

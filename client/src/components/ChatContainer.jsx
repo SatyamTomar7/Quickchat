@@ -8,6 +8,8 @@ const ChatContainer = () => {
   const {
     messages,
     selectedUser,
+    setSelectedConversation,
+    selectedConversation,
     setSelectedUser,
     sendMessage,
     getMessages,
@@ -17,6 +19,8 @@ const ChatContainer = () => {
     editMessage,
     deleteMessage,
     toggleReaction,
+    loadOlderMessages,
+    messagePage,
   } =
     useContext(ChatContext);
   const { authUser, onlineUsers } = useContext(AuthContext);
@@ -82,28 +86,37 @@ const ChatContainer = () => {
   }, [messages]);
   useEffect(() => () => window.clearTimeout(typingTimeout.current), []);
 
-  return selectedUser ? (
+  const activeConversation = selectedConversation || selectedUser;
+
+  useEffect(() => {
+    if (selectedConversation) getMessages(selectedConversation._id);
+  }, [getMessages, selectedConversation]);
+
+  return activeConversation ? (
     <div className="h-full overflow-scroll relative backdrop-blur-lg">
       {/* header   */}
       <div className="flex items-center gap-3 py-3 mx-4 border-b border-stone-500">
         <img
-          src={selectedUser.profilePic || assets.avatar_icon}
+          src={activeConversation.image || activeConversation.profilePic || assets.avatar_icon}
           alt=""
           className="w-8 rounded-full"
         />
         <div className="flex-1 text-lg text-white">
           <p className="flex items-center gap-2">
-          {selectedUser.fullName}
-          {onlineUsers.includes(selectedUser._id) && (
+          {activeConversation.name || activeConversation.fullName}
+          {!selectedConversation && onlineUsers.includes(selectedUser._id) && (
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
           )}
           </p>
-          {typingUsers[selectedUser._id] && (
+          {!selectedConversation && typingUsers[selectedUser._id] && (
             <p className="text-xs text-violet-300">User is typing...</p>
           )}
         </div>
         <img
-          onClick={() => setSelectedUser(null)}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedConversation(null);
+          }}
           src={assets.arrow_icon}
           alt=""
           className="md:hidden max-w-7"
@@ -111,7 +124,13 @@ const ChatContainer = () => {
         <img src={assets.help_icon} alt="" className="max-md:hidden max-w-5" />
       </div>
       {/* chat area  */}
-      <div className="flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6">
+      <div
+        onScroll={(event) => {
+          if (event.currentTarget.scrollTop === 0) loadOlderMessages();
+        }}
+        className="flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6"
+      >
+        {messagePage.loading && <p className="text-center text-xs text-gray-400">Loading older messages...</p>}
         {messages.map((msg) => {
           const senderId = typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
           const isMine = senderId === authUser._id;
@@ -196,7 +215,7 @@ const ChatContainer = () => {
                 src={
                   isMine
                     ? authUser?.profilePic || assets.avatar_icon
-                    : selectedUser?.profilePic || assets.avatar_icon
+                    : selectedConversation?.image || selectedUser?.profilePic || assets.avatar_icon
                 }
                 alt=""
                 className="w-7 rounded-full"

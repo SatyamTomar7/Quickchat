@@ -14,6 +14,10 @@ export const ChatProvider = ({ children }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [unseenMessages, setUnseenMessages] = useState({});
   const [typingUsers, setTypingUsers] = useState({});
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [messagePage, setMessagePage] = useState({ hasMore: false, nextCursor: null, loading: false });
+  const [searchedUsers, setSearchedUsers] = useState([]);
 
   const { socket, axios } = useContext(AuthContext);
 
@@ -30,9 +34,18 @@ export const ChatProvider = ({ children }) => {
   }, [axios]);
   const getMessages = useCallback(async (userId) => {
     try {
-      const { data } = await axios.get(`/api/messages/${userId}`);
+      const { data } = await axios.get(
+        selectedConversation?._id === userId
+          ? `/api/conversations/${userId}/messages?limit=30`
+          : `/api/messages/${userId}`,
+      );
       if (data.success) {
         setMessages(data.messages);
+        setMessagePage({
+          hasMore: data.hasMore || false,
+          nextCursor: data.nextCursor || null,
+          loading: false,
+        });
         setUnseenMessages((prev) => ({
           ...prev,
           [userId]: 0,
@@ -41,24 +54,86 @@ export const ChatProvider = ({ children }) => {
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to load messages");
     }
+  }, [axios, selectedConversation]);
+
+  const getConversations = useCallback(async () => {
+    try {
+      const { data } = await axios.get("/api/conversations");
+      if (data.success) setConversations(data.conversations);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to load conversations");
+    }
   }, [axios]);
+
+  const createGroup = useCallback(async (name, memberIds) => {
+    try {
+      const { data } = await axios.post("/api/conversations/groups", { name, memberIds });
+      if (data.success) {
+        setConversations((previous) => [data.conversation, ...previous]);
+        setSelectedConversation(data.conversation);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to create group");
+    }
+  }, [axios]);
+
+  const searchUsers = useCallback(async (query) => {
+    if (!query.trim()) {
+      setSearchedUsers([]);
+      return;
+    }
+    try {
+      const { data } = await axios.get(`/api/search/users?q=${encodeURIComponent(query.trim())}&limit=20`);
+      if (data.success) setSearchedUsers(data.users);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to search users");
+    }
+  }, [axios]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!selectedConversation || !messagePage.hasMore || messagePage.loading) return;
+    setMessagePage((previous) => ({ ...previous, loading: true }));
+    try {
+      const { data } = await axios.get(
+        `/api/conversations/${selectedConversation._id}/messages?limit=30&cursor=${messagePage.nextCursor}`,
+      );
+      if (data.success) {
+        setMessages((previous) => {
+          const known = new Set(previous.map((message) => message._id));
+          return [...data.messages.filter((message) => !known.has(message._id)), ...previous];
+        });
+        setMessagePage({ hasMore: data.hasMore, nextCursor: data.nextCursor, loading: false });
+      }
+    } catch (error) {
+      setMessagePage((previous) => ({ ...previous, loading: false }));
+      toast.error(error.response?.data?.message || "Unable to load older messages");
+    }
+  }, [axios, messagePage, selectedConversation]);
 
   const sendMessage = useCallback(async (messageData) => {
     try {
-      if (!selectedUser) return; 
+      if (!selectedUser && !selectedConversation) return;
+      const targetId = selectedConversation?._id || selectedUser?._id;
       const { data } = await axios.post(
-        `/api/messages/send/${selectedUser._id}`,
+        selectedConversation
+          ? `/api/conversations/${targetId}/messages`
+          : `/api/messages/send/${targetId}`,
         messageData,
       );
       if (data.success) {
-        setMessages((prevMessages) => [...prevMessages, data.newMessage]);
+        const message = data.newMessage || data.message;
+        setMessages((prevMessages) =>
+          prevMessages.some((item) => item._id === message._id)
+            ? prevMessages
+            : [...prevMessages, message],
+        );
       } else {
         toast.error(data.message);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to send message");
     }
-  }, [axios, selectedUser]);
+  }, [axios, selectedConversation, selectedUser]);
 
   const updateMessage = useCallback((messageId, update) => {
     setMessages((previous) =>
@@ -161,6 +236,12 @@ export const ChatProvider = ({ children }) => {
     socket.on("messageEdited", handleEdited);
     socket.on("messageDeleted", handleDeleted);
     socket.on("messageReaction", handleReaction);
+    socket.on("conversation:message", (message) => {
+      if (selectedConversation?._id !== message.conversationId) return;
+      setMessages((previous) =>
+        previous.some((item) => item._id === message._id) ? previous : [...previous, message],
+      );
+    });
 
     return () => {
       socket.off("newMessage", handleNewMessage);
@@ -170,8 +251,15 @@ export const ChatProvider = ({ children }) => {
       socket.off("messageEdited", handleEdited);
       socket.off("messageDeleted", handleDeleted);
       socket.off("messageReaction", handleReaction);
+      socket.off("conversation:message");
     };
-  }, [axios, selectedUser, socket, updateMessage]);
+  }, [axios, selectedConversation, selectedUser, socket, updateMessage]);
+
+  useEffect(() => {
+    if (!socket || !selectedConversation) return;
+    socket.emit("conversation:join", { conversationId: selectedConversation._id });
+    return () => socket.emit("conversation:leave", { conversationId: selectedConversation._id });
+  }, [selectedConversation, socket]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -197,7 +285,9 @@ export const ChatProvider = ({ children }) => {
     unseenMessages,
     setUnseenMessages,
     getMessages
-    ,typingUsers, editMessage, deleteMessage, toggleReaction, startTyping, stopTyping
+    ,typingUsers, editMessage, deleteMessage, toggleReaction, startTyping, stopTyping,
+    conversations, selectedConversation, setSelectedConversation, getConversations,
+    createGroup, loadOlderMessages, messagePage, searchUsers, searchedUsers
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

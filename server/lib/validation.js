@@ -44,6 +44,28 @@ export const reactionSchema = z.object({
   emoji: z.string().trim().min(1).max(16).regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, "Invalid emoji"),
 }).strict();
 
+export const groupSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  memberIds: z.array(objectId).min(1).max(100),
+  image: imageDataUrl.optional(),
+}).strict();
+
+export const memberSchema = z.object({
+  userId: objectId,
+}).strict();
+
+export const conversationUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  image: imageDataUrl.optional(),
+}).strict().refine(({ name, image }) => Boolean(name || image), "Name or image is required");
+
+export const searchSchema = z.object({
+  q: z.string().trim().min(1).max(100),
+  conversationId: objectId.optional(),
+  cursor: objectId.optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+}).strict();
+
 export const isValidObjectId = (value) => objectId.safeParse(value).success;
 
 export const getBase64ImageSize = (value) => {

@@ -1,7 +1,8 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import Conversation from "../models/Conversation.js";
 import {cloudinary} from "../lib/cloudinary.js";
-import { emitToUser, userSocketMap } from "../server.js";
+import { emitToUser, io, userSocketMap } from "../server.js";
 import { editMessageSchema, getBase64ImageSize, isValidObjectId, MAX_IMAGE_SIZE, messageSchema, reactionSchema } from "../lib/validation.js";
 import { getValidationMessage, sendError } from "../lib/http.js";
 
@@ -125,10 +126,15 @@ export const sendMessage = async (req, res) => {
 
 const getConversationMessage = async (messageId, userId) => {
   if (!isValidObjectId(messageId)) return null;
-  return Message.findOne({
+  const message = await Message.findOne({
     _id: messageId,
     $or: [{ senderId: userId }, { receiverId: userId }],
   });
+  if (message) return message;
+  const groupMessage = await Message.findOne({ _id: messageId, conversationId: { $exists: true } });
+  if (!groupMessage) return null;
+  const conversation = await Conversation.exists({ _id: groupMessage.conversationId, members: userId, deleted: false });
+  return conversation ? groupMessage : null;
 };
 
 export const editMessage = async (req, res) => {
@@ -142,7 +148,11 @@ export const editMessage = async (req, res) => {
     message.edited = true;
     await message.save();
     const payload = { messageId: message._id, text: message.text, edited: true };
-    emitToUser(message.receiverId, "messageEdited", payload);
+    if (message.conversationId) {
+      io.to(`conversation:${message.conversationId}`).emit("messageEdited", payload);
+    } else {
+      emitToUser(message.receiverId, "messageEdited", payload);
+    }
     emitToUser(message.senderId, "messageEdited", payload);
     res.json({ success: true, message });
   } catch (error) {
@@ -164,7 +174,11 @@ export const deleteMessage = async (req, res) => {
     message.edited = false;
     await message.save();
     const payload = { messageId: message._id, deleted: true };
-    emitToUser(message.receiverId, "messageDeleted", payload);
+    if (message.conversationId) {
+      io.to(`conversation:${message.conversationId}`).emit("messageDeleted", payload);
+    } else {
+      emitToUser(message.receiverId, "messageDeleted", payload);
+    }
     emitToUser(message.senderId, "messageDeleted", payload);
     res.json({ success: true, message });
   } catch (error) {
@@ -190,7 +204,11 @@ export const updateReaction = async (req, res) => {
     }
     await message.save();
     const payload = { messageId: message._id, reactions: message.reactions };
-    emitToUser(message.receiverId, "messageReaction", payload);
+    if (message.conversationId) {
+      io.to(`conversation:${message.conversationId}`).emit("messageReaction", payload);
+    } else {
+      emitToUser(message.receiverId, "messageReaction", payload);
+    }
     emitToUser(message.senderId, "messageReaction", payload);
     res.json({ success: true, reactions: message.reactions });
   } catch (error) {
