@@ -19,7 +19,7 @@ const server = http.createServer(app);
 // ✅ Allowed frontend URLs
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://quickchat-weld-seven.vercel.app",
+  "https://quickchat-wvgk-ten.vercel.app",
   process.env.CLIENT_URL
 ].filter(Boolean);
 
