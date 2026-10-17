@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import assets from "../assets/assets";
 import { AuthContext } from "../../context/AuthContext";
@@ -6,20 +6,13 @@ const ProfilePage = () => {
   const { authUser, updateProfile } = useContext(AuthContext);
   const [selectedImg, setSelectedImg] = useState(null);
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [bio, setBio] = useState("");
-
-  useEffect(() => {
-    if (authUser) {
-      setName(authUser.fullName || "");
-      setBio(authUser.bio || "");
-    }
-  }, [authUser]);
+  const [name, setName] = useState(authUser?.fullName || "");
+  const [bio, setBio] = useState(authUser?.bio || "");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedImg) {
-      await updateProfile({ fullname: name, bio });
+      await updateProfile({ fullName: name, bio });
       navigate("/");
       return;
     }
@@ -27,7 +20,7 @@ const ProfilePage = () => {
     reader.readAsDataURL(selectedImg);
     reader.onload = async () => {
       const base64Image = reader.result;
-      await updateProfile({ profilePic: base64Image, fullname: name, bio });
+      await updateProfile({ profilePic: base64Image, fullName: name, bio });
       navigate("/");
     };
     // navigate("/", { state: { profileImg: selectedImg } });

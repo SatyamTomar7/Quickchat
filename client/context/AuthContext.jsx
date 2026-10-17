@@ -1,12 +1,8 @@
-import axios from "axios";
-import { useState } from "react";
-import { useEffect } from "react";
-import { createContext } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
-axios.defaults.baseURL = backendUrl;
-export const AuthContext = createContext();
+import { AuthContext } from "./AuthContext";
+import api from "../src/lib/api";
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -14,33 +10,45 @@ export const AuthProvider = ({ children }) => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [socket, setSocket] = useState(null);
 
-  const checkAuth = async () => {
+  const connectSocket = useCallback((userData, authToken = localStorage.getItem("token")) => {
+    if (!userData || socket?.connected) return;
+    const newSocket = io(import.meta.env.VITE_BACKEND_URL, {
+      auth: {
+        token: authToken,
+      },
+    });
+    setSocket(newSocket);
+    newSocket.on("getOnlineUsers", (userIds) => {
+      setOnlineUsers(userIds);
+    });
+  }, [socket]);
+
+  const checkAuth = useCallback(async () => {
     try {
-      const { data } = await axios.get("/api/auth/check");
+      const { data } = await api.get("/api/auth/check");
       if (data.success) {
         setAuthUser(data.user);
         connectSocket(data.user);
       }
     } catch (error) {
-      toast.error(error.message);
+      if (error.response?.status !== 401) toast.error(error.response?.data?.message || "Unable to verify session");
     }
-  };
+  }, [connectSocket]);
+
   const login = async (state, credentials) => {
     try {
-      const { data } = await axios.post(`/api/auth/${state}`, credentials);
-      console.log("--------------------",data)
+      const { data } = await api.post(`/api/auth/${state}`, credentials);
       if (data.success) {
         setAuthUser(data.userData);
-        connectSocket(data.userData);
-        axios.defaults.headers.common["token"] = data.token;
-        setToken(data.token);
         localStorage.setItem("token", data.token);
+        setToken(data.token);
+        connectSocket(data.userData, data.token);
         toast.success(data.message);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Unable to authenticate");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to authenticate");
     }
   };
   const logout = async () => {
@@ -48,42 +56,27 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setAuthUser(null);
     setOnlineUsers([]);
-    axios.defaults.headers.common["token"] = null;
     toast.success("Logged out successfully");
     socket?.disconnect();
+    setSocket(null);
   };
   const updateProfile = async (body) => {
     try {
-      const { data } = await axios.put("/api/auth/update-profile", body);
+      const { data } = await api.put("/api/auth/update-profile", body);
       if (data.success) {
         setAuthUser(data.user);
         toast.success("Profile updated successfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to update profile");
     }
   };
 
-  const connectSocket = (userData) => {
-    if (!userData || socket?.connected) return;
-    const newSocket = io(backendUrl, {
-      query: {
-        userId: userData._id,
-      },
-    });
-    newSocket.connect();
-    setSocket(newSocket);
-    newSocket.on("getOnlineUsers", (userIds) => {
-      setOnlineUsers(userIds);
-    });
-  };
   useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common["token"] = token;
-    }
-    checkAuth();
-  }, [token]);
+    if (!token) return;
+    queueMicrotask(() => void checkAuth());
+  }, [checkAuth, token]);
 
-  const value = { axios, authUser, onlineUsers, socket ,login,logout,updateProfile};
+  const value = { axios: api, authUser, onlineUsers, socket, login, logout, updateProfile };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

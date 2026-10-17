@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { ChatContext } from "../../context/ChatContext";
 
-const Sidebar = ({}) => {
+const Sidebar = () => {
   const {
     getUsers,
     users,
@@ -25,7 +25,7 @@ const Sidebar = ({}) => {
 
   useEffect(() => {
     getUsers();
-  }, [onlineUsers]);
+  }, [getUsers, onlineUsers]);
 
   return (
     <div

@@ -1,13 +1,11 @@
 import {
-  createContext,
   useContext,
   useEffect,
   useState,
 } from "react";
+import { ChatContext } from "./ChatContext";
 import { AuthContext } from "./AuthContext";
 import toast from "react-hot-toast";
-
-export const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
@@ -25,7 +23,7 @@ export const ChatProvider = ({ children }) => {
         setUnseenMessages(data.unseenMessages);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to load users");
     }
   };
   const getMessages = async (userId) => {
@@ -39,7 +37,7 @@ export const ChatProvider = ({ children }) => {
         }));
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to load messages");
     }
   };
 
@@ -56,7 +54,7 @@ export const ChatProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to send message");
     }
   };
 
@@ -83,7 +81,7 @@ export const ChatProvider = ({ children }) => {
         try {
           await axios.put(`/api/messages/mark/${newMessage._id}`);
         } catch (error) {
-          toast.error(error.message);
+          toast.error(error.response?.data?.message || "Unable to mark message as seen");
         }
         return;
       }

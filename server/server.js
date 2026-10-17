@@ -3,6 +3,7 @@ import "dotenv/config";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
@@ -13,11 +14,12 @@ const server = http.createServer(app);
 // ✅ Allowed frontend URLs
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://quickchat-weld-seven.vercel.app"
-];
+  "https://quickchat-weld-seven.vercel.app",
+  process.env.CLIENT_URL
+].filter(Boolean);
 
 // ✅ Middleware
-app.use(express.json({ limit: "4mb" }));
+app.use(express.json({ limit: "7mb" }));
 
 app.use(cors({
   origin: allowedOrigins,
@@ -35,21 +37,29 @@ export const io = new Server(server, {
 // ✅ Store online users
 export const userSocketMap = {};
 
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error("Authentication required"));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.userId = decoded.userId;
+    next();
+  } catch {
+    next(new Error("Authentication required"));
+  }
+});
+
 // ✅ Socket connection
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
+  const userId = socket.userId.toString();
 
-  console.log("User Connected:", userId);
-
-  if (userId) userSocketMap[userId] = socket.id;
+  userSocketMap[userId] = socket.id;
 
   // send online users list
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   socket.on("disconnect", () => {
-    console.log("User Disconnected:", userId);
-
-    if (userId) delete userSocketMap[userId];
+    if (userSocketMap[userId] === socket.id) delete userSocketMap[userId];
 
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
@@ -59,6 +69,14 @@ io.on("connection", (socket) => {
 app.get("/api/status", (req, res) => res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+
+app.use((error, req, res, next) => {
+  if (error.type === "entity.too.large") {
+    return res.status(413).json({ success: false, message: "Request payload is too large" });
+  }
+  console.error("Unhandled server error:", error.message);
+  res.status(500).json({ success: false, message: "Internal server error" });
+});
 
 // ✅ Connect DB
 await connectDB();
