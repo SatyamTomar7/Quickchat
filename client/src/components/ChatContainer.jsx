@@ -5,19 +5,55 @@ import { ChatContext } from "../../context/ChatContext";
 import { AuthContext } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 const ChatContainer = () => {
-  const { messages, selectedUser, setSelectedUser, sendMessage, getMessages } =
+  const {
+    messages,
+    selectedUser,
+    setSelectedUser,
+    sendMessage,
+    getMessages,
+    typingUsers,
+    startTyping,
+    stopTyping,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+  } =
     useContext(ChatContext);
   const { authUser, onlineUsers } = useContext(AuthContext);
 
   const scrollEnd = useRef();
 
   const [input, setInput] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState("");
+  const typingTimeout = useRef();
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (input.trim() === "") return null;
+    stopTyping();
+    window.clearTimeout(typingTimeout.current);
     await sendMessage({ text: input.trim() });
     setInput("");
+  };
+
+  const handleInputChange = (event) => {
+    const value = event.target.value;
+    setInput(value);
+    if (value.trim()) {
+      startTyping();
+      window.clearTimeout(typingTimeout.current);
+      typingTimeout.current = window.setTimeout(stopTyping, 2500);
+    } else {
+      stopTyping();
+    }
+  };
+
+  const saveEdit = async (messageId) => {
+    if (!editingText.trim()) return;
+    await editMessage(messageId, editingText.trim());
+    setEditingId(null);
+    setEditingText("");
   };
 
   const handleSendImage = async (e) => {
@@ -44,6 +80,7 @@ const ChatContainer = () => {
       scrollEnd.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+  useEffect(() => () => window.clearTimeout(typingTimeout.current), []);
 
   return selectedUser ? (
     <div className="h-full overflow-scroll relative backdrop-blur-lg">
@@ -54,12 +91,17 @@ const ChatContainer = () => {
           alt=""
           className="w-8 rounded-full"
         />
-        <p className="flex-1 text-lg text-white flex items-center gap-2">
+        <div className="flex-1 text-lg text-white">
+          <p className="flex items-center gap-2">
           {selectedUser.fullName}
           {onlineUsers.includes(selectedUser._id) && (
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
           )}
-        </p>
+          </p>
+          {typingUsers[selectedUser._id] && (
+            <p className="text-xs text-violet-300">User is typing...</p>
+          )}
+        </div>
         <img
           onClick={() => setSelectedUser(null)}
           src={assets.arrow_icon}
@@ -70,14 +112,36 @@ const ChatContainer = () => {
       </div>
       {/* chat area  */}
       <div className="flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6">
-        {messages.map((msg, index) => (
+        {messages.map((msg) => {
+          const senderId = typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
+          const isMine = senderId === authUser._id;
+          const reactionCounts = (msg.reactions || []).reduce((counts, reaction) => ({
+            ...counts,
+            [reaction.emoji]: (counts[reaction.emoji] || 0) + 1,
+          }), {});
+          return (
           <div
-            key={index}
+            key={msg._id}
             className={`flex items-end gap-2 ${
-              msg.senderId === authUser._id ? "justify-end" : "justify-start"
+              isMine ? "justify-end" : "justify-start"
             }`}
           >
-            {msg.image ? (
+            {msg.deleted ? (
+              <p className="p-2 max-w-[240px] md:text-sm italic text-gray-400 rounded-lg mb-8 bg-gray-500/20">
+                This message was deleted
+              </p>
+            ) : editingId === msg._id ? (
+              <div className="flex gap-2 mb-8">
+                <input
+                  value={editingText}
+                  onChange={(event) => setEditingText(event.target.value)}
+                  className="p-2 rounded bg-gray-800 text-white"
+                  maxLength={2000}
+                />
+                <button onClick={() => saveEdit(msg._id)} className="text-green-300">Save</button>
+                <button onClick={() => setEditingId(null)} className="text-gray-300">Cancel</button>
+              </div>
+            ) : msg.image ? (
               <img
                 src={msg.image}
                 alt=""
@@ -85,15 +149,52 @@ const ChatContainer = () => {
               />
             ) : (
               <p
-                className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${msg.senderId === authUser._id ? "rounded-br-none" : "rounded-bl-none"}`}
+                className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${isMine ? "rounded-br-none" : "rounded-bl-none"}`}
               >
                 {msg.text}
               </p>
             )}
+            {!msg.deleted && (
+              <div className="flex items-center gap-1 mb-8">
+                {["👍", "❤️", "😂"].map((emoji) => (
+                  (() => {
+                    const reactedByMe = (msg.reactions || []).some(
+                      (reaction) =>
+                        (typeof reaction.userId === "object" ? reaction.userId?._id : reaction.userId) === authUser._id &&
+                        reaction.emoji === emoji,
+                    );
+                    return (
+                  <button
+                    key={emoji}
+                    onClick={() => toggleReaction(msg._id, emoji)}
+                    className={`text-xs opacity-80 hover:opacity-100 ${reactedByMe ? "ring-1 ring-violet-300 rounded" : ""}`}
+                    aria-label={`React with ${emoji}`}
+                  >
+                    {emoji} {(reactionCounts[emoji] || 0) > 0 ? reactionCounts[emoji] : ""}
+                  </button>
+                    );
+                  })()
+                ))}
+                {isMine && !msg.image && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingId(msg._id);
+                        setEditingText(msg.text || "");
+                      }}
+                      className="text-xs text-violet-300"
+                    >
+                      Edit
+                    </button>
+                    <button onClick={() => deleteMessage(msg._id)} className="text-xs text-red-300">Delete</button>
+                  </>
+                )}
+              </div>
+            )}
             <div className="text-center text-xs">
               <img
                 src={
-                  msg.senderId === authUser._id
+                  isMine
                     ? authUser?.profilePic || assets.avatar_icon
                     : selectedUser?.profilePic || assets.avatar_icon
                 }
@@ -103,9 +204,11 @@ const ChatContainer = () => {
               <p className="text-gray-500">
                 {formatMessageTime(msg.createdAt)}
               </p>
+              {isMine && <p className="text-gray-500">{msg.status || (msg.seen ? "seen" : "sent")}</p>}
             </div>
           </div>
-        ))}
+          );
+        })}
         <div ref={scrollEnd}></div>
       </div>
 
@@ -116,7 +219,7 @@ const ChatContainer = () => {
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
             placeholder="Send a message"
             className="w-full bg-transparent py-2 outline-none"

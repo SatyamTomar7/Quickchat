@@ -5,6 +5,8 @@ import http from "http";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { connectDB } from "./lib/db.js";
+import Message from "./models/Message.js";
+import { isValidObjectId } from "./lib/validation.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 
@@ -37,6 +39,13 @@ export const io = new Server(server, {
 // ✅ Store online users
 export const userSocketMap = {};
 
+export const emitToUser = (userId, event, payload) => {
+  const sockets = userSocketMap[userId.toString()];
+  if (sockets) {
+    for (const socketId of sockets) io.to(socketId).emit(event, payload);
+  }
+};
+
 io.use((socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
@@ -53,15 +62,47 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
   const userId = socket.userId.toString();
 
-  userSocketMap[userId] = socket.id;
+  if (!userSocketMap[userId]) userSocketMap[userId] = new Set();
+  userSocketMap[userId].add(socket.id);
+
+  Message.find({ receiverId: userId, status: "sent" })
+    .select("_id senderId")
+    .lean()
+    .then(async (pendingMessages) => {
+      if (!pendingMessages.length) return;
+      await Message.updateMany(
+        { receiverId: userId, status: "sent" },
+        { $set: { status: "delivered" } },
+      );
+      for (const message of pendingMessages) {
+        emitToUser(message.senderId, "messageStatus", {
+          messageId: message._id,
+          status: "delivered",
+        });
+      }
+    })
+    .catch((error) => console.error("Pending delivery update failed:", error.message));
 
   // send online users list
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   socket.on("disconnect", () => {
-    if (userSocketMap[userId] === socket.id) delete userSocketMap[userId];
+    userSocketMap[userId]?.delete(socket.id);
+    if (!userSocketMap[userId]?.size) delete userSocketMap[userId];
 
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+  });
+
+  socket.on("typing:start", (payload) => {
+    const receiverId = payload?.receiverId;
+    if (!isValidObjectId(receiverId) || receiverId === userId) return;
+    emitToUser(receiverId, "typing:start", { userId });
+  });
+
+  socket.on("typing:stop", (payload) => {
+    const receiverId = payload?.receiverId;
+    if (!isValidObjectId(receiverId) || receiverId === userId) return;
+    emitToUser(receiverId, "typing:stop", { userId });
   });
 });
 

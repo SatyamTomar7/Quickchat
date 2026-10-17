@@ -36,6 +36,14 @@ export const messageSchema = z.object({
   "A message must contain text or an image",
 );
 
+export const editMessageSchema = z.object({
+  text: z.string().trim().min(1).max(2000),
+}).strict();
+
+export const reactionSchema = z.object({
+  emoji: z.string().trim().min(1).max(16).regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, "Invalid emoji"),
+}).strict();
+
 export const isValidObjectId = (value) => objectId.safeParse(value).success;
 
 export const getBase64ImageSize = (value) => {
