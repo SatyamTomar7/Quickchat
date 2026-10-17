@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 import { AuthContext } from "./AuthContext";
 import api from "../src/lib/api";
+import { backendUrl } from "../src/lib/config";
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -12,7 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   const connectSocket = useCallback((userData, authToken = localStorage.getItem("token")) => {
     if (!userData || socket?.connected) return;
-    const newSocket = io(import.meta.env.VITE_BACKEND_URL, {
+    const newSocket = io(backendUrl, {
       auth: {
         token: authToken,
       },

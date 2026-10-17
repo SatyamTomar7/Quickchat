@@ -1,16 +1,29 @@
-# React + Vite
+# QuickChat frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Production configuration
 
-Currently, two official plugins are available:
+Set `BACKEND_URL` in the frontend deployment environment to the public URL of
+the running server. For the current Vercel production deployment, set it to
+`https://quickchat-ygpw.onrender.com`. Vite embeds this URL into the production
+bundle at build time, so changing the variable requires a new frontend
+deployment.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The Vite configuration exposes only `BACKEND_URL` to frontend code. Do not put
+backend secrets in the frontend environment.
 
-## React Compiler
+The server must set `CLIENT_URL` to the exact frontend origin, including the
+`https://` scheme and without a trailing slash.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the ESLint configuration
+Copy `.env.example` to `.env` and run:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
